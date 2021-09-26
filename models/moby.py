@@ -131,7 +131,9 @@ class MoBY(nn.Module):
         logits /= self.contrast_temperature
 
         # labels: positive key indicators
-        labels = torch.zeros(logits.shape[0], dtype=torch.long).cuda()
+        labels = torch.zeros(logits.shape[0], dtype=torch.long)
+        labels[0] = 1
+        labels = labels.cuda()
 
         return F.cross_entropy(logits, labels)
 

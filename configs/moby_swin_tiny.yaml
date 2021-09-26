@@ -1,13 +1,14 @@
 TRAIN:
   WARMUP_EPOCHS: 5
-  EPOCHS: 300
+  EPOCHS: 20
   BASE_LR: 0.001
   WEIGHT_DECAY: 0.05
 AUG:
   SSL_AUG: True
 MODEL:
   TYPE: moby
-  NAME: moby__swin_tiny__patch4_window7_224__odpr02_tdpr0_cm099_ct02_queue4096_proj2_pred2
+  NAME: moby__swin_tiny_docs
+  RESUME: https://github.com/SwinTransformer/storage/releases/download/v1.0.3/moby_swin_t_300ep_pretrained.pth
   SWIN:
     EMBED_DIM: 96
     DEPTHS: [ 2, 2, 6, 2 ]

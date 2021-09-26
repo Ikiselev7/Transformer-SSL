@@ -21,8 +21,13 @@ class CustomImageFolder(datasets.ImageFolder):
         
         ret = []
         if self.transform is not None:
-            for t in self.transform:
-                ret.append(t(image))
+            if len(self.transform) == 3:
+                base = self.transform[2](image)
+                for t in self.transform[:2]:
+                    ret.append(t(base))
+            else:
+                for t in self.transform:
+                    ret.append(t(image))
         else:
             ret.append(image)
         if self.target_transform is not None:

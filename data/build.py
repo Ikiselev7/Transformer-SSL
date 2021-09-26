@@ -96,9 +96,11 @@ def build_transform(is_train, config):
     if config.AUG.SSL_AUG:
         if config.AUG.SSL_AUG_TYPE == 'byol':
             normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-            
+            base_transform = transforms.Compose([
+                transforms.RandomResizedCrop(config.DATA.IMG_SIZE, scale=(0.06, .0625)),
+                transforms.RandomRotation(90),
+            ])
             transform_1 = transforms.Compose([
-                transforms.RandomResizedCrop(config.DATA.IMG_SIZE, scale=(config.AUG.SSL_AUG_CROP, 1.)),
                 transforms.RandomHorizontalFlip(),
                 transforms.RandomApply([transforms.ColorJitter(0.4, 0.4, 0.2, 0.1)], p=0.8),
                 transforms.RandomGrayscale(p=0.2),
@@ -107,7 +109,6 @@ def build_transform(is_train, config):
                 normalize,
             ])
             transform_2 = transforms.Compose([
-                transforms.RandomResizedCrop(config.DATA.IMG_SIZE, scale=(config.AUG.SSL_AUG_CROP, 1.)),
                 transforms.RandomHorizontalFlip(),
                 transforms.RandomApply([transforms.ColorJitter(0.4, 0.4, 0.2, 0.1)], p=0.8),
                 transforms.RandomGrayscale(p=0.2),
@@ -117,7 +118,7 @@ def build_transform(is_train, config):
                 normalize,
             ])
             
-            transform = (transform_1, transform_2)
+            transform = (transform_1, transform_2, base_transform)
             return transform
         else:
             raise NotImplementedError
