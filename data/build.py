@@ -34,7 +34,7 @@ class RandomMask(torch.nn.Module):
         re_img = rearrange(img_t, '(h p1) (w p2) c -> (h w) p1 p2 c', p1=patch_size_x, p2=patch_size_y)
         rand_indices = torch.rand((img_t.shape[0] // patch_size_x) * (img_t.shape[1] // patch_size_y)).argsort(dim=-1)
         mask = rand_indices[:int(rand_indices.shape[0]*part)]
-        mask_t = torch.zeros(patch_size_x, patch_size_y, img_t.shape[2], dtype=torch.float) + self.fill
+        mask_t = torch.zeros(patch_size_x, patch_size_y, img_t.shape[2], dtype=torch.uint8) + self.fill
         re_img[mask] = mask_t
         return rearrange(re_img, '(h w) p1 p2 c -> (h p1) (w p2) c', h=img_t.shape[0] // patch_size_x)
 
