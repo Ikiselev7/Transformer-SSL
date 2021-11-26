@@ -11,6 +11,7 @@ import torch
 import numpy as np
 from PIL import ImageFilter, ImageOps
 import torch.distributed as dist
+from PIL import Image
 from torchvision import datasets, transforms
 from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 from timm.data import Mixup
@@ -24,23 +25,37 @@ from .samplers import SubsetRandomSampler
 
 
 class RandomMask(torch.nn.Module):
-    def __init__(self, patch_prob=((4, 0.25), (8, 0.25), (16, 0.125), (32, 0.05)), fill=128.0):
+    def __init__(self, patch_prob=((4, 0.25), (8, 0.125), (16, 0.07), (32, 0.05)), fill=128):
         super().__init__()
         self.patch_prob = patch_prob
         self.fill = fill
 
     def apply_mask(self, img_t, patch_size_x=4, patch_size_y=4, part=0.25):
-        re_img = rearrange(img_t, ' c (h p1) (w p2)-> (h w) p1 p2 c', p1=patch_size_x, p2=patch_size_y)
-        rand_indices = torch.rand((img_t.shape[1] // patch_size_x) * (img_t.shape[2] // patch_size_y)).argsort(dim=-1)
+        re_img = rearrange(img_t, '(h p1) (w p2) c -> (h w) p1 p2 c', p1=patch_size_x, p2=patch_size_y)
+        rand_indices = torch.rand((img_t.shape[0] // patch_size_x) * (img_t.shape[1] // patch_size_y)).argsort(dim=-1)
         mask = rand_indices[:int(rand_indices.shape[0]*part)]
-        mask_t = torch.zeros(patch_size_x, patch_size_y, img_t.shape[0], dtype=torch.float) + self.fill
+        mask_t = torch.zeros(patch_size_x, patch_size_y, img_t.shape[2], dtype=torch.float) + self.fill
         re_img[mask] = mask_t
-        return rearrange(re_img, '(h w) p1 p2 c -> c (h p1) (w p2)', h=img_t.shape[1] // patch_size_x)
+        return rearrange(re_img, '(h w) p1 p2 c -> (h p1) (w p2) c', h=img_t.shape[0] // patch_size_x)
 
-    def forward(self, img):
+    def forward(self, pic):
+        if pic.mode == 'I':
+            img = torch.from_numpy(np.array(pic, np.int32, copy=False))
+        elif pic.mode == 'I;16':
+            img = torch.from_numpy(np.array(pic, np.int16, copy=False))
+        elif pic.mode == 'F':
+            img = torch.from_numpy(np.array(pic, np.float32, copy=False))
+        elif pic.mode == '1':
+            img = 255 * torch.from_numpy(np.array(pic, np.uint8, copy=False))
+        else:
+            img = torch.ByteTensor(torch.ByteStorage.from_buffer(pic.tobytes()))
+
+        img = img.view(pic.size[1], pic.size[0], len(pic.getbands()))
+
         for patch, part in self.patch_prob:
             img = self.apply_mask(img, patch_size_x=patch, patch_size_y=patch, part=part)
-        return img
+
+        return Image.fromarray(img.numpy())
 
 
 def build_loader(config):

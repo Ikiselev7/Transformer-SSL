@@ -13,6 +13,39 @@ import torch.nn.functional as F
 import torch.distributed as dist
 
 from diffdist import functional
+from torch.autograd import Variable
+
+
+class FocalLoss(nn.Module):
+    def __init__(self, gamma=0, alpha=None, size_average=True):
+        super(FocalLoss, self).__init__()
+        self.gamma = gamma
+        self.alpha = alpha
+        if isinstance(alpha, (float, int)):
+            self.alpha = torch.Tensor([alpha, 1-alpha])
+        if isinstance(alpha, list):
+            self.alpha = torch.Tensor(alpha)
+        self.size_average = size_average
+
+    def forward(self, input, target):
+        target = target.view(-1, 1)
+
+        logpt = F.log_softmax(input)
+        logpt = logpt.gather(1, target)
+        logpt = logpt.view(-1)
+        pt = Variable(logpt.data.exp())
+
+        if self.alpha is not None:
+            if self.alpha.type() != input.data.type():
+                self.alpha = self.alpha.type_as(input.data)
+            at = self.alpha.gather(0, target.data.view(-1))
+            logpt = logpt * Variable(at)
+
+        loss = -1 * (1-pt)**self.gamma * logpt
+        if self.size_average:
+            return loss.mean()
+        else:
+            return loss.sum()
 
 
 def dist_collect(x):
@@ -84,6 +117,7 @@ class MoBY(nn.Module):
         self.queue2 = F.normalize(self.queue2, dim=0)
 
         self.register_buffer("queue_ptr", torch.zeros(1, dtype=torch.long))
+        self.loss = FocalLoss(gamma=5)
 
     @torch.no_grad()
     def _momentum_update_key_encoder(self):
@@ -108,12 +142,12 @@ class MoBY(nn.Module):
         batch_size = keys1.shape[0]
 
         ptr = int(self.queue_ptr)
-        assert self.contrast_num_negative % batch_size == 0  # for simplicity
+        # assert self.contrast_num_negative % batch_size == 0  # for simplicity
 
         # replace the keys at ptr (dequeue and enqueue)
         self.queue1[:, ptr:ptr + batch_size] = keys1.T
         self.queue2[:, ptr:ptr + batch_size] = keys2.T
-        ptr = (ptr + batch_size) % self.contrast_num_negative  # move pointer
+        ptr = (ptr + batch_size) % 16*48  # move pointer
 
         self.queue_ptr[0] = ptr
 
@@ -122,7 +156,7 @@ class MoBY(nn.Module):
         # positive logits: Nx1
         l_pos = torch.einsum('nc,nc->n', [q, k]).unsqueeze(-1)
         # negative logits: NxK
-        l_neg = torch.einsum('nc,ck->nk', [q, queue.clone().detach()])
+        l_neg = torch.einsum('nc,ck->nk', [q, queue.clone().detach()[:16 * len(l_pos)]])
 
         # logits: Nx(1+K)
         logits = torch.cat([l_pos, l_neg], dim=1)
@@ -131,11 +165,12 @@ class MoBY(nn.Module):
         logits /= self.contrast_temperature
 
         # labels: positive key indicators
-        labels = torch.zeros(logits.shape[0], dtype=torch.long)
-        labels[0] = 1
-        labels = labels.cuda()
+        labels = torch.zeros(logits.shape[0], dtype=torch.long).cuda()
 
-        return F.cross_entropy(logits, labels)
+        preds = torch.argmax(logits, dim=1)
+        correct = (preds == labels).sum().item()
+
+        return self.loss(logits, labels), correct
 
     def forward(self, im_1, im_2):
         feat_1 = self.encoder(im_1)  # queries: NxC
@@ -150,7 +185,7 @@ class MoBY(nn.Module):
 
         # compute key features
         with torch.no_grad():  # no gradient to keys
-            self._momentum_update_key_encoder()  # update the key encoder
+            # self._momentum_update_key_encoder()  # update the key encoder
 
             feat_1_ng = self.encoder_k(im_1)  # keys: NxC
             proj_1_ng = self.projector_k(feat_1_ng)
@@ -161,12 +196,13 @@ class MoBY(nn.Module):
             proj_2_ng = F.normalize(proj_2_ng, dim=1)
 
         # compute loss
-        loss = self.contrastive_loss(pred_1, proj_2_ng, self.queue2) \
-            + self.contrastive_loss(pred_2, proj_1_ng, self.queue1)
+        contrastive_loss_1, corr_1 = self.contrastive_loss(pred_1, proj_2_ng, self.queue2)
+        contrastive_loss_2, corr_2 = self.contrastive_loss(pred_2, proj_1_ng, self.queue1)
+        loss = contrastive_loss_1 + contrastive_loss_2
 
         self._dequeue_and_enqueue(proj_1_ng, proj_2_ng)
 
-        return loss
+        return loss, corr_2 + corr_1
     
     
 class MoBYMLP(nn.Module):

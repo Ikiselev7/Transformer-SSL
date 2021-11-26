@@ -134,6 +134,7 @@ def train_one_epoch(config, model, data_loader, optimizer, epoch, lr_scheduler):
     num_steps = len(data_loader)
     batch_time = AverageMeter()
     loss_meter = AverageMeter()
+    acc_meter = AverageMeter()
     norm_meter = AverageMeter()
 
     start = time.time()
@@ -143,7 +144,7 @@ def train_one_epoch(config, model, data_loader, optimizer, epoch, lr_scheduler):
         samples_2 = samples_2.cuda(non_blocking=True)
         targets = targets.cuda(non_blocking=True)
 
-        loss = model(samples_1, samples_2)
+        loss, corr = model(samples_1, samples_2)
 
         optimizer.zero_grad()
         if config.AMP_OPT_LEVEL != "O0":
@@ -159,12 +160,14 @@ def train_one_epoch(config, model, data_loader, optimizer, epoch, lr_scheduler):
                 grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), config.TRAIN.CLIP_GRAD)
             else:
                 grad_norm = get_grad_norm(model.parameters())
+        model.module._momentum_update_key_encoder()  # update the key encoder
         optimizer.step()
         lr_scheduler.step_update(epoch * num_steps + idx)
 
         torch.cuda.synchronize()
 
         loss_meter.update(loss.item(), targets.size(0))
+        acc_meter.update(corr / (2 * len(samples_1)), 2 * len(samples_1))
         norm_meter.update(grad_norm)
         batch_time.update(time.time() - end)
         end = time.time()
@@ -178,6 +181,7 @@ def train_one_epoch(config, model, data_loader, optimizer, epoch, lr_scheduler):
                 f'eta {datetime.timedelta(seconds=int(etas))} lr {lr:.6f}\t'
                 f'time {batch_time.val:.4f} ({batch_time.avg:.4f})\t'
                 f'loss {loss_meter.val:.4f} ({loss_meter.avg:.4f})\t'
+                f'acc {acc_meter.val:.4f} ({acc_meter.avg:.4f})\t'
                 f'grad_norm {norm_meter.val:.4f} ({norm_meter.avg:.4f})\t'
                 f'mem {memory_used:.0f}MB')
     epoch_time = time.time() - start
