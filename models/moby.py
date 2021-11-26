@@ -147,7 +147,7 @@ class MoBY(nn.Module):
         # replace the keys at ptr (dequeue and enqueue)
         self.queue1[:, ptr:ptr + batch_size] = keys1.T
         self.queue2[:, ptr:ptr + batch_size] = keys2.T
-        ptr = (ptr + batch_size) % 16*48  # move pointer
+        ptr = (ptr + batch_size) % (16*batch_size)  # move pointer
 
         self.queue_ptr[0] = ptr
 

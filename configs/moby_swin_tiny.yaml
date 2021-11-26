@@ -1,21 +1,20 @@
 TRAIN:
   WARMUP_EPOCHS: 1
   EPOCHS: 50
-  BASE_LR: 0.001
+  BASE_LR: 0.01
   WEIGHT_DECAY: 0.05
   AUTO_RESUME: true
 AUG:
   SSL_AUG: True
 MODEL:
   TYPE: moby
-  NAME: moby__swin_tiny_docs_focal_16
+  NAME: moby__swin_tiny_docs_focal_16_no_ape
   RESUME: https://github.com/SwinTransformer/storage/releases/download/v1.0.3/moby_swin_t_300ep_pretrained.pth
   SWIN:
     EMBED_DIM: 96
     DEPTHS: [ 2, 2, 6, 2 ]
     NUM_HEADS: [ 3, 6, 12, 24 ]
     WINDOW_SIZE: 7
-    APE: true
   MOBY:
     ENCODER: swin
     ONLINE_DROP_PATH_RATE: 0.2

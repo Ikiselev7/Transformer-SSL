@@ -133,29 +133,30 @@ def build_transform(is_train, config):
         if config.AUG.SSL_AUG_TYPE == 'byol':
             normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
             base_transform = transforms.Compose([
-                transforms.RandomResizedCrop(config.DATA.IMG_SIZE, scale=(0.06, .0625)),
-                transforms.RandomRotation(90),
+                transforms.RandomResizedCrop(config.DATA.IMG_SIZE, scale=(0.03, .12)),
             ])
             transform_1 = transforms.Compose([
                 transforms.RandomHorizontalFlip(),
+                RandomMask(),
+                transforms.RandomRotation(90),
                 transforms.RandomApply([transforms.ColorJitter(0.4, 0.4, 0.2, 0.1)], p=0.8),
                 transforms.RandomGrayscale(p=0.2),
                 transforms.RandomApply([GaussianBlur()], p=1.0),
                 transforms.ToTensor(),
-                RandomMask(),
                 normalize,
             ])
             transform_2 = transforms.Compose([
                 transforms.RandomHorizontalFlip(),
+                RandomMask(),
+                transforms.RandomRotation(90),
                 transforms.RandomApply([transforms.ColorJitter(0.4, 0.4, 0.2, 0.1)], p=0.8),
                 transforms.RandomGrayscale(p=0.2),
                 transforms.RandomApply([GaussianBlur()], p=0.1),
                 transforms.RandomApply([ImageOps.solarize], p=0.2),
                 transforms.ToTensor(),
-                RandomMask(),
                 normalize,
             ])
-            
+
             transform = (transform_1, transform_2, base_transform)
             return transform
         else:
