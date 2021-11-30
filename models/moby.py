@@ -167,10 +167,10 @@ class MoBY(nn.Module):
         # labels: positive key indicators
         labels = torch.zeros(logits.shape[0], dtype=torch.long).cuda()
 
-        preds = torch.argmax(logits, dim=1)
+        preds = torch.argmax(F.sigmoid(logits), dim=1)
         correct = (preds == labels).sum().item()
 
-        return self.loss(logits, labels), correct
+        return F.cross_entropy(logits, labels), correct
 
     def forward(self, im_1, im_2):
         feat_1 = self.encoder(im_1)  # queries: NxC
