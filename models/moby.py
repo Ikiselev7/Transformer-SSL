@@ -147,7 +147,7 @@ class MoBY(nn.Module):
         # replace the keys at ptr (dequeue and enqueue)
         self.queue1[:, ptr:ptr + batch_size] = keys1.T
         self.queue2[:, ptr:ptr + batch_size] = keys2.T
-        ptr = (ptr + batch_size) % (16*batch_size)  # move pointer
+        ptr = (ptr + batch_size) % (8*batch_size)  # move pointer
 
         self.queue_ptr[0] = ptr
 
@@ -156,7 +156,7 @@ class MoBY(nn.Module):
         # positive logits: Nx1
         l_pos = torch.einsum('nc,nc->n', [q, k]).unsqueeze(-1)
         # negative logits: NxK
-        l_neg = torch.einsum('nc,ck->nk', [q, queue.clone().detach()[:16 * len(l_pos)]])
+        l_neg = torch.einsum('nc,ck->nk', [q, queue.clone().detach()[:8 * len(l_pos)]])
 
         # logits: Nx(1+K)
         logits = torch.cat([l_pos, l_neg], dim=1)
@@ -185,7 +185,7 @@ class MoBY(nn.Module):
 
         # compute key features
         with torch.no_grad():  # no gradient to keys
-            # self._momentum_update_key_encoder()  # update the key encoder
+            self._momentum_update_key_encoder()  # update the key encoder
 
             feat_1_ng = self.encoder_k(im_1)  # keys: NxC
             proj_1_ng = self.projector_k(feat_1_ng)

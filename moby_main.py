@@ -160,10 +160,9 @@ def train_one_epoch(config, model, data_loader, optimizer, epoch, lr_scheduler):
                 grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), config.TRAIN.CLIP_GRAD)
             else:
                 grad_norm = get_grad_norm(model.parameters())
-        model.module._momentum_update_key_encoder()  # update the key encoder
         optimizer.step()
         lr_scheduler.step_update(epoch * num_steps + idx)
-
+        # model.module._momentum_update_key_encoder()
         torch.cuda.synchronize()
 
         loss_meter.update(loss.item(), targets.size(0))

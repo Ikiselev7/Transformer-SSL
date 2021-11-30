@@ -138,7 +138,7 @@ def build_transform(is_train, config):
             transform_1 = transforms.Compose([
                 transforms.RandomHorizontalFlip(),
                 RandomMask(),
-                transforms.RandomRotation(90),
+                # transforms.RandomRotation(90),
                 transforms.RandomApply([transforms.ColorJitter(0.4, 0.4, 0.2, 0.1)], p=0.8),
                 transforms.RandomGrayscale(p=0.2),
                 transforms.RandomApply([GaussianBlur()], p=1.0),
@@ -147,8 +147,8 @@ def build_transform(is_train, config):
             ])
             transform_2 = transforms.Compose([
                 transforms.RandomHorizontalFlip(),
-                RandomMask(),
-                transforms.RandomRotation(90),
+                # RandomMask(),
+                # transforms.RandomRotation(90),
                 transforms.RandomApply([transforms.ColorJitter(0.4, 0.4, 0.2, 0.1)], p=0.8),
                 transforms.RandomGrayscale(p=0.2),
                 transforms.RandomApply([GaussianBlur()], p=0.1),
